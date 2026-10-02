@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chrono Rogue: Rise of Humanity</title>
+<style>
+:root{
+  --bg:#0a0c11; --panel:#11141b; --line:#222736; --txt:#d8dce8; --dim:#7a8299;
+  --red:#ff5c6c; --green:#6fe08f; --accent:#ffb15c;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--mono);font-size:14px}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#app{max-width:1200px;margin:0 auto;padding:12px;display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:12px}
+@media(max-width:860px){#app{grid-template-columns:1fr}}
+#stage{position:relative}
+canvas{width:100%;height:auto;display:block;background:#000;border:1px solid var(--line);border-radius:4px}
+#banner{position:absolute;left:0;right:0;top:32%;text-align:center;pointer-events:none;opacity:0;padding:0 12px}
+#banner.show{animation:bn 3.2s ease forwards}
+#banner h2{margin:0;font-family:var(--serif);font-weight:700;font-size:clamp(24px,5.5vw,48px);color:var(--accent);text-shadow:0 0 22px var(--accent),0 2px 0 #000}
+#banner p{margin:6px 0 0;color:#fff;text-shadow:0 1px 4px #000;font-size:clamp(11px,2vw,14px)}
+@keyframes bn{0%{opacity:0;transform:translateY(10px)}12%{opacity:1;transform:none}78%{opacity:1}100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){#banner.show{animation:none;opacity:1}}
+aside{display:flex;flex-direction:column;gap:10px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:10px 12px}
+#eraName{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--accent);line-height:1.15}
+#eraDate{color:var(--dim);margin-top:2px}
+#pips{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-top:10px}
+#pips span{height:8px;background:var(--line);border-radius:1px}
+#pips span.done{background:var(--accent);opacity:.45}
+#pips span.cur{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+#pips span.final{outline:1px solid var(--dim)}
+.bar{height:10px;background:#1b1f2c;border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--red);transition:width .15s}
+.bar.xp i{background:#7aa7ff}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin-top:8px}
+.kv span:nth-child(odd){color:var(--dim)}
+.kv span:nth-child(even){text-align:right}
+#log{height:190px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;gap:3px;font-size:12.5px;line-height:1.35}
+#log div{opacity:.55}
+#log div:last-child{opacity:1}
+#log .bad{color:var(--red)} #log .good{color:var(--green)} #log .info{color:var(--accent)}
+.help{color:var(--dim);font-size:12px;line-height:1.55}
+.help b{color:var(--txt);font-weight:600}
+#pad{display:none;margin-top:10px;grid-template-columns:repeat(3,56px) 1fr repeat(2,64px);gap:6px;align-items:center}
+@media(hover:none){#pad{display:grid}}
+#pad button{height:52px;font:inherit;font-size:18px;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:6px;touch-action:manipulation}
+#pad button:active{background:var(--line)}
+#pad .gap{grid-column:4}
+button{font-family:inherit}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+#ov{position:fixed;inset:0;background:rgba(6,7,11,.94);display:none;overflow:auto;padding:24px 14px;z-index:5}
+.card{max-width:640px;margin:0 auto}
+.card h1{font-family:var(--serif);font-size:clamp(34px,8vw,56px);line-height:1;margin:0 0 6px;color:var(--accent)}
+.card h2{font-family:var(--serif);font-size:30px;margin:0 0 6px;color:var(--accent)}
+.card p{line-height:1.6;margin:10px 0;max-width:62ch}
+.dim{color:var(--dim)}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 20px;margin:14px 0;max-width:420px}
+.stats span:nth-child(even){text-align:right}
+.shop{border:1px solid var(--line);border-radius:4px;margin:18px 0;background:var(--panel)}
+.shop .head{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+.shop .row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line)}
+.shop .row:last-child{border-bottom:0}
+.shop .pips{letter-spacing:2px;color:var(--accent);font-size:11px;margin-top:2px}
+button.buy{min-width:72px;padding:7px 10px;background:transparent;color:var(--txt);border:1px solid var(--dim);border-radius:3px;cursor:pointer}
+button.buy:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+button.buy:disabled{opacity:.35;cursor:default}
+button.big{padding:13px 22px;font-size:15px;font-weight:700;background:var(--accent);color:#14100a;border:0;border-radius:3px;cursor:pointer}
+button.big:hover{filter:brightness(1.1)}
+button.link{background:none;border:0;color:var(--dim);text-decoration:underline;cursor:pointer;padding:6px 0;margin-left:14px}
+</style>
+</head>
+<body>
+<noscript>This game needs JavaScript.</noscript>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv" aria-label="Game map"></canvas>
+    <div id="banner"></div>
+    <div id="pad">
+      <button data-d="-1,-1" aria-label="up left">↖</button><button data-d="0,-1" aria-label="up">↑</button><button data-d="1,-1" aria-label="up right">↗</button>
+      <span class="gap"></span>
+      <button data-a="skill" aria-label="invention">Q</button><button data-a="heal" aria-label="drink">E</button>
+      <button data-d="-1,0" aria-label="left">←</button><button data-a="wait" aria-label="wait">·</button><button data-d="1,0" aria-label="right">→</button>
+      <span class="gap"></span><span></span><span></span>
+      <button data-d="-1,1" aria-label="down left">↙</button><button data-d="0,1" aria-label="down">↓</button><button data-d="1,1" aria-label="down right">↘</button>
+    </div>
+  </div>
+  <aside>
+    <div class="panel">
+      <div id="eraName"></div>
+      <div id="eraDate"></div>
+      <div id="pips"></div>
+    </div>
+    <div class="panel">
+      <div class="bar"><i id="hpbar"></i></div>
+      <div class="kv" style="margin-top:6px"><span>Health</span><span id="hpTxt"></span></div>
+      <div class="bar xp" style="margin-top:8px"><i id="xpbar"></i></div>
+      <div class="kv" id="stats"></div>
+    </div>
+    <div class="panel" id="log"></div>
+    <div class="panel help">
+      <b>Move</b> arrows, WASD, vi-keys, numpad<br>
+      <b>Q</b> era invention (area blast) &nbsp; <b>E</b> use remedy<br>
+      <b>.</b> or <b>Space</b> wait<br>
+      Defeat the guardian to open the way on.
+    </div>
+  </aside>
+</div>
+<div id="ov"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ───────────── constants & helpers ───────────── */
+const W = 44, H = 26, T = 20;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+cv.width = W * T; cv.height = H * T;
+const $ = id => document.getElementById(id);
+const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const grid = v => Array.from({ length: H }, () => Array(W).fill(v));
+const DIRS = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+
+/* ───────────── era data ─────────────
+   Add an era by pushing one more object here. The last era is the finale. */
+const F = (n, g, c, hp, atk, xp, fl) => ({ n, g, c, hp, atk, xp, fast: fl === 'f', ranged: fl === 'r' });
+const ERAS = [
+  { name:'Stone Age', date:'2,500,000 BCE', tag:'Make fire. Do not get eaten.',
+    bg:'#120e0a', wall:'#5a4630', floor:'#2b2118', accent:'#ffb15c',
+    weapon:'Flint Spear', armor:'Hide Wraps', skill:'Wildfire', pot:'Healing Herbs', lore:'Cave Painting',
+    foes:[F('Dire Wolf','w','#d0d0d0',.7,1,1,'f'),F('Cave Bear','B','#b06a3c',1.6,1.1,2),F('Rival Hunter','h','#e6b684',1,1,1.5)],
+    boss:F('Woolly Mammoth','M','#d9a070',1,1,1) },
+  { name:'Bronze Age', date:'3000 BCE', tag:'Cities rise. So do the people who raid them.',
+    bg:'#14100a', wall:'#7a5c2a', floor:'#31250f', accent:'#e8a24a',
+    weapon:'Bronze Sword', armor:'Bronze Cuirass', skill:'Chariot Charge', pot:'Honey Salve', lore:'Clay Tablet',
+    foes:[F('Desert Jackal','j','#d8b878',.7,1,1,'f'),F('Sling Raider','s','#e0c090',.8,1,1.3,'r'),F('Chariot Guard','c','#c88a50',1.5,1.1,2)],
+    boss:F('Stone Sphinx','S','#e8c878',1,1,1) },
+  { name:'Classical Antiquity', date:'100 CE', tag:'All roads lead through the arena.',
+    bg:'#10121a', wall:'#8a8a9a', floor:'#2a2c38', accent:'#d9c27a',
+    weapon:'Iron Gladius', armor:'Legionary Lorica', skill:'Catapult Volley', pot:'Olive Oil Tonic', lore:'Papyrus Scroll',
+    foes:[F('Legionary','L','#d85a4a',1.1,1,1.4),F('Auxiliary Archer','a','#c8b080',.8,1,1.4,'r'),F('Gladiator','G','#e0a040',1.5,1.15,2)],
+    boss:F('Mad Emperor','E','#c070e0',1,1,1) },
+  { name:'Medieval Era', date:'1200 CE', tag:'Plague, steel, and one very large lizard.',
+    bg:'#0d1210', wall:'#5f6a64', floor:'#1f2724', accent:'#9fc9a4',
+    weapon:'Knight\u2019s Longsword', armor:'Plate Armor', skill:'Greek Fire', pot:'Monk\u2019s Elixir', lore:'Illuminated Codex',
+    foes:[F('Plague Rat','r','#a09070',.6,.9,1,'f'),F('Crossbowman','x','#c8c090',.8,1.1,1.5,'r'),F('Knight','K','#b8c0c8',1.6,1.1,2)],
+    boss:F('Dread Dragon','D','#ff6a3a',1,1,1,'r') },
+  { name:'Renaissance', date:'1500 CE', tag:'Ideas are the sharpest weapon. Also, gunpowder.',
+    bg:'#150e12', wall:'#7e4c5c', floor:'#2f1c24', accent:'#e8a0b8',
+    weapon:'Flintlock Pistol', armor:'Brigandine', skill:'Gunpowder Blast', pot:'Apothecary Tonic', lore:'Anatomy Sketch',
+    foes:[F('Corsair','p','#e8d070',1,1,1.4),F('Musketeer','m','#80a8e0',.8,1.2,1.6,'r'),F('Inquisitor','I','#d04040',1.4,1.1,2)],
+    boss:F('Mad Alchemist','A','#7af07a',1,1,1) },
+  { name:'Industrial Age', date:'1850 CE', tag:'Steam, soot, and a train that will not stop.',
+    bg:'#100f0e', wall:'#5a544c', floor:'#241f1b', accent:'#e0803c',
+    weapon:'Steam Rifle', armor:'Iron Vest', skill:'Steam Burst', pot:'Patent Medicine', lore:'Patent Blueprint',
+    foes:[F('Factory Rat','r','#9a8a78',.6,.9,1,'f'),F('Sharpshooter','p','#b0a090',.8,1.2,1.6,'r'),F('Steam Automaton','A','#d0a060',1.8,1.1,2.2)],
+    boss:F('Railway Baron','R','#e8c050',1,1,1) },
+  { name:'Modern Era', date:'1944 CE', tag:'The century of speed, and of very big guns.',
+    bg:'#0c1014', wall:'#4c5a68', floor:'#1c252e', accent:'#7ec0ff',
+    weapon:'Assault Rifle', armor:'Kevlar Vest', skill:'Frag Grenade', pot:'Field Medkit', lore:'Field Manual',
+    foes:[F('Attack Drone','d','#e0e0e0',.6,1,1.2,'f'),F('Sniper','n','#90a070',.8,1.3,1.7,'r'),F('Infantry','s','#8aa060',1.4,1.1,1.8)],
+    boss:F('Prototype Tank','T','#a0b080',1,1,1,'r') },
+  { name:'Information Age', date:'2030 CE', tag:'Everything is connected. Something is awake.',
+    bg:'#050b0c', wall:'#10504a', floor:'#08211f', accent:'#3dffd0',
+    weapon:'Pulse Rifle', armor:'Nanoweave Suit', skill:'EMP Pulse', pot:'Nano-Injector', lore:'Leaked Dataset',
+    foes:[F('Glitch','g','#ff60c0',.6,1,1.2,'f'),F('Hacker','h','#60e0ff',.8,1.3,1.8,'r'),F('Security Bot','b','#c0c8d0',1.7,1.1,2.2)],
+    boss:F('Rogue AI','\u03A9','#3dffd0',1,1,1,'r') },
+  { name:'The Chrono Age', date:'\u221E', tag:'Time travel is almost yours. Reach the machine.',
+    bg:'#0d0818', wall:'#4d3190', floor:'#1b1034', accent:'#c58cff',
+    weapon:'Chrono Blade', armor:'Temporal Shell', skill:'Time Rift', pot:'Chrono Serum', lore:'Paradox Fragment',
+    foes:[F('Time Wraith','w','#b0a0ff',.7,1.1,1.3,'f'),F('Echo Archer','e','#ffa0d0',.8,1.3,1.8,'r'),F('Past Self','@','#ffcf5c',1.6,1.2,2.4)],
+    boss:F('The Paradox','\u039E','#ff5cf0',1,1,1,'r') }
+];
+const LAST = ERAS.length - 1;
+
+/* ───────────── meta progression (persists between runs) ───────────── */
+const UPS = [
+  { k:'hp',     n:'Ancestral Vigor',  d:'+5 max health',            max:10, cost:10 },
+  { k:'atk',    n:'Sharpened Memory', d:'+1 attack',                max:8,  cost:15 },
+  { k:'def',    n:'Echo Armor',       d:'+1 defense',               max:8,  cost:15 },
+  { k:'potion', n:'Packed Supplies',  d:'+1 starting remedy',       max:4,  cost:12 },
+  { k:'sight',  n:'Far Sight',        d:'+1 vision radius',         max:4,  cost:10 },
+  { k:'xp',     n:'Quick Learner',    d:'+10% experience',          max:5,  cost:12 }
+];
+const SAVE_KEY = 'chrono-rogue-v1';
+const freshMeta = () => ({ echoes:0, loops:0, runs:0, best:0, up:{ hp:0, atk:0, def:0, potion:0, sight:0, xp:0 } });
+let memSave = null;
+function load() {
+  let m = freshMeta();
+  try {
+    const raw = localStorage.getItem(SAVE_KEY) || memSave;
+    if (raw) { const o = JSON.parse(raw); m = Object.assign(m, o, { up: Object.assign(m.up, o.up || {}) }); }
+  } catch (e) { /* storage unavailable: play without saving */ }
+  return m;
+}
+function save() {
+  const s = JSON.stringify(meta);
+  memSave = s;
+  try { localStorage.setItem(SAVE_KEY, s); } catch (e) { /* ignore */ }
+}
+let meta = load();
+
+/* ───────────── state ───────────── */
+let run = null, P = null, dmap = null, dirty = true, ovOpen = false, screen = null;
+
+/* ───────────── map generation ───────────── */
+function genMap() {
+  const m = grid(1), rooms = [];
+  for (let i = 0; i < 300 && rooms.length < 10; i++) {
+    const w = rnd(4, 9), h = rnd(4, 7), x = rnd(1, W - w - 2), y = rnd(1, H - h - 2);
+    if (rooms.some(r => x < r.x + r.w + 1 && x + w + 1 > r.x && y < r.y + r.h + 1 && y + h + 1 > r.y)) continue;
+    rooms.push({ x, y, w, h, cx: x + (w >> 1), cy: y + (h >> 1) });
+    for (let j = y; j < y + h; j++) for (let k = x; k < x + w; k++) m[j][k] = 0;
+  }
+  if (rooms.length < 5) return null;
+  const corridor = (a, b) => {
+    let x = a.cx, y = a.cy;
+    const hx = () => { while (x !== b.cx) { x += Math.sign(b.cx - x); m[y][x] = 0; } };
+    const vy = () => { while (y !== b.cy) { y += Math.sign(b.cy - y); m[y][x] = 0; } };
+    if (Math.random() < .5) { hx(); vy(); } else { vy(); hx(); }
+  };
+  for (let i = 1; i < rooms.length; i++) corridor(rooms[i - 1], rooms[i]);
+  for (let i = 0; i < 3; i++) corridor(pick(rooms), pick(rooms));
+  return { map: m, rooms };
+}
+
+const monAt = (x, y) => run.mons.find(m => m.hp > 0 && m.x === x && m.y === y);
+const itemAt = (x, y) => run.items.find(i => i.x === x && i.y === y);
+const isFree = (x, y) => run.map[y][x] === 0 && !monAt(x, y) && !itemAt(x, y) &&
+  !(P.x === x && P.y === y) && !(run.stairs.x === x && run.stairs.y === y);
+function freeIn(r) {
+  for (let i = 0; i < 30; i++) {
+    const x = rnd(r.x, r.x + r.w - 1), y = rnd(r.y, r.y + r.h - 1);
+    if (isFree(x, y)) return { x, y };
+  }
+  return null;
+}
+
+function mkMon(t, x, y, boss) {
+  const e = run.era, L = run.loop;
+  const hp = Math.round(8 * t.hp * (1 + .55 * e) * (1 + .2 * L) * (boss ? 7 : 1));
+  const atk = Math.round(3 * t.atk * (1 + .5 * e) * (1 + .12 * L) * (boss ? 1.5 : 1));
+  const xp = Math.round(4 * t.xp * (1 + .4 * e) * (boss ? 5 : 1));
+  return { x, y, t, hp, maxhp: hp, atk, xp, boss: !!boss, awake: false, enraged: false };
+}
+
+function newLevel() {
+  const E = ERAS[run.era];
+  let g; do { g = genMap(); } while (!g);
+  run.map = g.map;
+  run.seen = grid(false); run.vis = grid(false);
+  run.mons = []; run.items = []; run.bossDead = false; run.stairMsgTurn = -1;
+  const start = g.rooms[0];
+  P.x = start.cx; P.y = start.cy;
+
+  let far = g.rooms[1], best = -1;
+  for (const r of g.rooms.slice(1)) {
+    const d = Math.abs(r.cx - start.cx) + Math.abs(r.cy - start.cy);
+    if (d > best) { best = d; far = r; }
+  }
+  run.stairs = { x: far.cx, y: far.cy };
+  run.mons.push(mkMon(E.boss, far.cx - 1, far.cy, true));
+
+  const others = g.rooms.slice(1).filter(r => r !== far);
+  for (const r of others) {
+    const n = (run.era === 0 ? rnd(0, 1) + (Math.random() < .35 ? 1 : 0) : rnd(1, 2)) + (run.era >= 2 ? 1 : 0) + (run.era >= 5 ? 1 : 0) + (run.loop > 1 ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      const p = freeIn(r); if (p) run.mons.push(mkMon(pick(E.foes), p.x, p.y, false));
+    }
+  }
+  const itemRooms = g.rooms.slice(1);
+  const put = (kind, extra) => { const p = freeIn(pick(itemRooms)); if (p) run.items.push(Object.assign({ x: p.x, y: p.y, kind }, extra)); };
+  const nearest = g.rooms.slice(1).sort((a, b) => Math.hypot(a.cx - start.cx, a.cy - start.cy) - Math.hypot(b.cx - start.cx, b.cy - start.cy))[0];
+  const pw = freeIn(start); if (pw) run.items.push({ x: pw.x, y: pw.y, kind: 'weapon', tier: run.era });
+  const pa = freeIn(nearest); if (pa) run.items.push({ x: pa.x, y: pa.y, kind: 'armor', tier: run.era });
+  for (let i = 0, n = 2 + rnd(0, 2); i < n; i++) put('potion');
+  for (let i = 0, n = rnd(1, 2); i < n; i++) put('scroll');
+
+  computeFov();
+  const where = E.boss.n;
+  banner(E.name, E.date + ' \u2014 ' + E.tag);
+  log(`You arrive in the ${E.name}. ${where} guards the way forward.`, 'info');
+  document.documentElement.style.setProperty('--accent', E.accent);
+  dirty = true;
+}
+
+/* ───────────── geometry ───────────── */
+function canStep(x, y, dx, dy) {
+  const nx = x + dx, ny = y + dy;
+  if (nx < 0 || ny < 0 || nx >= W || ny >= H) return false;
+  if (run.map[ny][nx] !== 0) return false;
+  if (dx && dy && run.map[y][nx] === 1 && run.map[ny][x] === 1) return false;
+  return true;
+}
+function los(x0, y0, x1, y1) {
+  let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy, x = x0, y = y0;
+  while (!(x === x1 && y === y1)) {
+    if (!(x === x0 && y === y0) && run.map[y][x] === 1) return false;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x += sx; }
+    if (e2 < dx) { err += dx; y += sy; }
+  }
+  return true;
+}
+function computeFov() {
+  const r = 7 + meta.up.sight;
+  for (let y = 0; y < H; y++) run.vis[y].fill(false);
+  for (let y = Math.max(0, P.y - r); y <= Math.min(H - 1, P.y + r); y++)
+    for (let x = Math.max(0, P.x - r); x <= Math.min(W - 1, P.x + r); x++) {
+      const dx = x - P.x, dy = y - P.y;
+      if (dx * dx + dy * dy <= r * r && los(P.x, P.y, x, y)) { run.vis[y][x] = true; run.seen[y][x] = true; }
+    }
+}
+function computeDmap() {
+  dmap = grid(1e9);
+  const q = [[P.x, P.y]]; dmap[P.y][P.x] = 0;
+  for (let i = 0; i < q.length; i++) {
+    const [x, y] = q[i], d = dmap[y][x];
+    if (d >= 30) continue;
+    for (const [dx, dy] of DIRS) {
+      if (!canStep(x, y, dx, dy)) continue;
+      const nx = x + dx, ny = y + dy;
+      if (dmap[ny][nx] > d + 1) { dmap[ny][nx] = d + 1; q.push([nx, ny]); }
+    }
+  }
+}
+
+/* ───────────── player stats ───────────── */
+const atkTot = () => 3 + (P.lvl - 1) + meta.up.atk + (P.wT >= 0 ? 3 + 3 * P.wT : 0);
+const defTot = () => meta.up.def + (P.aT >= 0 ? 1 + P.aT : 0) + (P.lvl / 4 | 0);
+function gainXp(n) {
+  P.xp += Math.round(n * (1 + .1 * meta.up.xp));
+  for (;;) {
+    const need = 12 + P.lvl * 14;
+    if (P.xp < need) break;
+    P.xp -= need; P.lvl++; P.maxhp += 6; P.hp = Math.min(P.maxhp, P.hp + 10);
+    log(`You reach level ${P.lvl}. Stronger and a bit smarter.`, 'good');
+    fxText(P.x, P.y, 'LEVEL UP', '#7aa7ff');
+  }
+}
+
+/* ───────────── logging, effects ───────────── */
+function log(m, c) { run.log.push({ m, c: c || '' }); if (run.log.length > 40) run.log.shift(); dirty = true; }
+function fxText(x, y, txt, col) { run.fx.push({ k:'t', x, y, txt, col, t0: performance.now() }); }
+function fxRing(x, y, r, col) { run.fx.push({ k:'r', x, y, r, col, t0: performance.now() }); }
+function banner(t, s) {
+  const b = $('banner');
+  b.innerHTML = `<h2></h2><p></p>`;
+  b.firstChild.textContent = t; b.lastChild.textContent = s;
+  b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+}
+
+/* ───────────── combat ───────────── */
+function attack(m) {
+  let dmg = atkTot() + rnd(0, 2), crit = Math.random() < .1;
+  if (crit) dmg *= 2;
+  m.hp -= dmg; m.awake = true;
+  fxText(m.x, m.y, (crit ? '!' : '') + dmg, crit ? '#ffcf5c' : '#ffffff');
+  if (m.hp <= 0) kill(m);
+  else log(`You ${crit ? 'critically ' : ''}hit the ${m.t.n} for ${dmg}.`);
+}
+function kill(m) {
+  run.kills++; run.echoes += m.boss ? 10 : 1;
+  run.mons = run.mons.filter(x => x !== m);
+  log(`The ${m.t.n} is defeated.`, 'good');
+  gainXp(m.xp);
+  if (m.boss) {
+    run.bossDead = true;
+    run.items.push({ x: m.x, y: m.y, kind: 'potion' });
+    log(run.era === LAST ? 'The Paradox unravels. The Time Machine hums to life!' : 'The way forward opens.', 'info');
+  } else if (Math.random() < .12) run.items.push({ x: m.x, y: m.y, kind: 'potion' });
+}
+function hitPlayer(m, mult, ranged) {
+  const raw = Math.round(m.atk * mult);
+  const dmg = Math.max(Math.ceil(raw * .2), raw - defTot() + rnd(-1, 1));
+  P.hp -= dmg; run.killer = m.t.n; run.flash = performance.now();
+  fxText(P.x, P.y, '-' + dmg, '#ff5c6c');
+  log(`The ${m.t.n} ${ranged ? 'shoots' : 'hits'} you for ${dmg}.`, 'bad');
+}
+function monStep(m) {
+  const cur = dmap[m.y][m.x]; let best = null, bd = cur;
+  for (const [dx, dy] of DIRS.slice().sort(() => Math.random() - .5)) {
+    if (!canStep(m.x, m.y, dx, dy)) continue;
+    const nx = m.x + dx, ny = m.y + dy;
+    if (monAt(nx, ny) || (nx === P.x && ny === P.y)) continue;
+    if (dmap[ny][nx] < bd) { bd = dmap[ny][nx]; best = [nx, ny]; }
+  }
+  if (best) { m.x = best[0]; m.y = best[1]; return true; }
+  return false;
+}
+function monAct(m) {
+  if (!m.awake) {
+    if (run.vis[m.y][m.x] || dmap[m.y][m.x] <= 7) { m.awake = true; if (m.boss && run.vis[m.y][m.x]) log(`The ${m.t.n} roars.`, 'bad'); }
+    else return;
+  }
+  if (m.boss && !m.enraged && m.hp < m.maxhp / 2) { m.enraged = true; log(`The ${m.t.n} is enraged!`, 'bad'); }
+  const moves = (m.t.fast || m.enraged) ? 2 : 1;
+  for (let k = 0; k < moves; k++) {
+    const d = Math.max(Math.abs(m.x - P.x), Math.abs(m.y - P.y));
+    if (d === 1) { hitPlayer(m, 1, false); return; }
+    if (m.t.ranged && d <= 6 && los(m.x, m.y, P.x, P.y)) { hitPlayer(m, .8, true); return; }
+    if (!monStep(m)) return;
+  }
+}
+
+/* ───────────── turn flow ───────────── */
+function endTurn() {
+  run.turn++;
+  if (P.skillCd > 0) P.skillCd--;
+  if (run.turn % 8 === 0 && P.hp < P.maxhp) P.hp = Math.min(P.maxhp, P.hp + 1 + (P.lvl / 6 | 0));
+  computeFov(); computeDmap();
+  for (const m of run.mons.slice()) { if (m.hp > 0) monAct(m); if (P.hp <= 0) break; }
+  dirty = true;
+  if (P.hp <= 0) die();
+}
+function checkStairs() {
+  if (P.x !== run.stairs.x || P.y !== run.stairs.y) return false;
+  if (!run.bossDead) {
+    if (run.stairMsgTurn !== run.turn) { log(run.era === LAST ? 'The Time Machine is sealed while the Paradox lives.' : 'The portal is sealed. The guardian must fall first.', 'info'); run.stairMsgTurn = run.turn; }
+    return false;
+  }
+  if (run.era === LAST) { win(); return true; }
+  advance(); return true;
+}
+function advance() {
+  run.era++; run.echoes += 5;
+  P.hp = Math.min(P.maxhp, P.hp + Math.round(P.maxhp * .3)); P.skillCd = 0;
+  newLevel();
+}
+function pickup() {
+  const i = run.items.findIndex(it => it.x === P.x && it.y === P.y);
+  if (i < 0) return;
+  const it = run.items[i]; run.items.splice(i, 1);
+  const E = ERAS[run.era];
+  if (it.kind === 'potion') {
+    if (P.potions < 6) { P.potions++; log(`You pick up ${E.pot}.`, 'good'); }
+    else { P.hp = Math.min(P.maxhp, P.hp + 8); log(`You use the spare ${E.pot} on the spot.`, 'good'); }
+  } else if (it.kind === 'weapon') {
+    if (it.tier > P.wT) { P.wT = it.tier; log(`You equip the ${ERAS[it.tier].weapon}. Attack is now ${atkTot()}.`, 'good'); }
+    else { gainXp(6); log('You scrap a weapon you have outgrown.'); }
+  } else if (it.kind === 'armor') {
+    if (it.tier > P.aT) { P.aT = it.tier; log(`You put on ${ERAS[it.tier].armor}. Defense is now ${defTot()}.`, 'good'); }
+    else { gainXp(6); log('You scrap armor you have outgrown.'); }
+  } else if (it.kind === 'scroll') {
+    gainXp(10 + run.era * 6); log(`You study a ${E.lore}. Knowledge gained.`, 'info');
+  }
+}
+function playerMove(dx, dy) {
+  if (!run || run.over || ovOpen) return;
+  const nx = P.x + dx, ny = P.y + dy, m = monAt(nx, ny);
+  if (m) { attack(m); if (checkStairs()) return; endTurn(); return; }
+  if (!canStep(P.x, P.y, dx, dy)) return;
+  P.x = nx; P.y = ny;
+  pickup();
+  if (checkStairs()) return;
+  endTurn();
+}
+function wait() { if (run && !run.over && !ovOpen) { if (checkStairs()) return; endTurn(); } }
+function drink() {
+  if (!run || run.over || ovOpen) return;
+  if (P.potions <= 0) { log('You have no remedies left.'); dirty = true; return; }
+  if (P.hp >= P.maxhp) { log('You are already at full health.'); dirty = true; return; }
+  P.potions--; const h = Math.max(12, Math.round(P.maxhp * .45));
+  P.hp = Math.min(P.maxhp, P.hp + h);
+  fxText(P.x, P.y, '+' + h, '#6fe08f'); log(`You use ${ERAS[run.era].pot} and recover ${h} health.`, 'good');
+  endTurn();
+}
+function useSkill() {
+  if (!run || run.over || ovOpen) return;
+  const E = ERAS[run.era];
+  if (P.skillCd > 0) { log(`${E.skill} needs ${P.skillCd} more turns to recover.`); dirty = true; return; }
+  const r = 2.5 + (run.era / 3 | 0), dmg = Math.round(atkTot() * 1.5);
+  const targets = run.mons.filter(m => m.hp > 0 && Math.hypot(m.x - P.x, m.y - P.y) <= r && run.vis[m.y][m.x]);
+  if (!targets.length) { log('Nothing in range. You hold the invention back.'); dirty = true; return; }
+  fxRing(P.x, P.y, r, E.accent);
+  log(`${E.skill}! It hits ${targets.length} foe${targets.length > 1 ? 's' : ''} for ${dmg}.`, 'info');
+  for (const m of targets) { m.hp -= dmg; m.awake = true; fxText(m.x, m.y, dmg, E.accent); if (m.hp <= 0) kill(m); }
+  P.skillCd = 18;
+  if (checkStairs()) return;
+  endTurn();
+}
+
+/* ───────────── run lifecycle ───────────── */
+function startRun() {
+  hideOv();
+  const mh = 30 + 5 * meta.up.hp;
+  run = { era:0, loop:meta.loops, turn:0, kills:0, echoes:0, over:false, log:[], fx:[], flash:0, killer:'' };
+  P = { x:0, y:0, hp:mh, maxhp:mh, lvl:1, xp:0, wT:-1, aT:-1, potions:meta.up.potion, skillCd:0 };
+  meta.runs++; save();
+  newLevel();
+  computeDmap();
+  if (run.loop > 0) log(`Loop ${run.loop + 1}. The past remembers you, and it has grown fierce.`, 'info');
+  dirty = true;
+}
+function endRun(won) {
+  run.over = true;
+  const bonus = won ? 100 + 25 * meta.loops : 0;
+  run.echoes += bonus;
+  meta.echoes += run.echoes;
+  meta.best = Math.max(meta.best, won ? ERAS.length : run.era + 1);
+  if (won) meta.loops++;
+  save();
+  setTimeout(() => ov(() => endHTML(won, bonus)), won ? 400 : 900);
+}
+const die = () => { log('You have fallen.', 'bad'); endRun(false); };
+const win = () => { log('You step into the Time Machine.', 'info'); endRun(true); };
+
+/* ───────────── overlays ───────────── */
+const ovEl = $('ov');
+function ov(fn) { screen = fn; ovEl.innerHTML = fn(); ovEl.style.display = 'block'; ovOpen = true; ovEl.scrollTop = 0; }
+function rerender() { if (screen) { const y = ovEl.scrollTop; ovEl.innerHTML = screen(); ovEl.scrollTop = y; } }
+function hideOv() { ovEl.style.display = 'none'; ovOpen = false; screen = null; }
+function shopHTML() {
+  return `<div class="shop"><div class="head"><span>Echoes carried back through time</span><b>${meta.echoes}</b></div>` +
+    UPS.map(u => {
+      const lv = meta.up[u.k], maxed = lv >= u.max, cost = u.cost * (lv + 1);
+      return `<div class="row"><div><b>${u.n}</b> <span class="dim">${u.d}</span>
+        <div class="pips">${'\u25CF'.repeat(lv)}${'\u25CB'.repeat(u.max - lv)}</div></div>
+        <button class="buy" data-buy="${u.k}" ${maxed || meta.echoes < cost ? 'disabled' : ''}>${maxed ? 'Maxed' : cost + ' echoes'}</button></div>`;
+    }).join('') + `</div>`;
+}
+function titleHTML() {
+  return `<div class="card">
+    <h1>Chrono Rogue</h1>
+    <p class="dim">Rise of Humanity</p>
+    <p>You are the first human to wake with a purpose. Fight your way through nine eras of history, from flint spears to pulse rifles, and learn enough along the way to build a Time Machine.</p>
+    <p>Each era ends with a guardian. Beat it, take the portal, and keep your gear and your levels. Die, and you begin again in the Stone Age. Reach the Time Machine and you can travel back to the beginning, carrying everything you learned. History will push back harder.</p>
+    ${meta.runs ? `<p class="dim">Runs so far: ${meta.runs}. Times history was looped: ${meta.loops}. Furthest era: ${ERAS[Math.max(0, meta.best - 1)].name}.</p>` : ''}
+    ${shopHTML()}
+    <button class="big" data-start>Begin in the Stone Age</button>
+    ${meta.runs ? `<button class="link" data-reset>Erase saved progress</button>` : ''}
+  </div>`;
+}
+function endHTML(won, bonus) {
+  const E = ERAS[run.era];
+  return `<div class="card">
+    <h2>${won ? 'Time travel unlocked' : 'Your story ends in the ' + E.name}</h2>
+    <p>${won
+      ? 'The Paradox is gone and the Time Machine is yours. You can step back to the dawn of humanity, carrying every lesson with you. Loop ' + (meta.loops + 1) + ' awaits, and the world will be harder.'
+      : `Slain by ${run.killer || 'the passage of time'}. Whatever you learned is not lost. It carries back as echoes.`}</p>
+    <div class="stats"><span class="dim">Era reached</span><span>${E.name}</span>
+      <span class="dim">Level</span><span>${P.lvl}</span>
+      <span class="dim">Foes defeated</span><span>${run.kills}</span>
+      <span class="dim">Turns taken</span><span>${run.turn}</span>
+      <span class="dim">Echoes earned</span><span>${run.echoes}${bonus ? ' (incl. ' + bonus + ' for winning)' : ''}</span></div>
+    ${shopHTML()}
+    <button class="big" data-start>${won ? 'Travel back to 2,500,000 BCE' : 'Try again from the Stone Age'}</button>
+  </div>`;
+}
+ovEl.addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.start !== undefined) startRun();
+  else if (t.dataset.buy) {
+    const u = UPS.find(x => x.k === t.dataset.buy), lv = meta.up[u.k], cost = u.cost * (lv + 1);
+    if (lv < u.max && meta.echoes >= cost) { meta.echoes -= cost; meta.up[u.k]++; save(); rerender(); }
+  } else if (t.dataset.reset !== undefined) {
+    if (confirm('Erase all saved progress?')) { meta = freshMeta(); save(); rerender(); }
+  }
+});
+
+/* ───────────── rendering ───────────── */
+function draw() {
+  if (!run) { ctx.fillStyle = '#05060a'; ctx.fillRect(0, 0, cv.width, cv.height); return; }
+  const now = performance.now(), E = ERAS[run.era];
+  ctx.fillStyle = E.bg; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.font = `bold ${T - 4}px "Courier New",monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const gl = (ch, x, y, col) => { ctx.fillStyle = col; ctx.fillText(ch, x * T + T / 2, y * T + T / 2 + 1); };
+
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (!run.seen[y][x]) continue;
+    if (run.map[y][x] === 1) {
+      ctx.fillStyle = E.wall; ctx.fillRect(x * T, y * T, T, T);
+      ctx.fillStyle = 'rgba(255,255,255,.10)'; ctx.fillRect(x * T, y * T, T, 3);
+      ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x * T, y * T + T - 3, T, 3);
+    } else {
+      ctx.fillStyle = E.floor; ctx.fillRect(x * T, y * T, T, T);
+      if (run.vis[y][x]) { ctx.fillStyle = E.accent; ctx.globalAlpha = .18; ctx.fillRect(x * T + T / 2 - 1, y * T + T / 2 - 1, 2, 2); ctx.globalAlpha = 1; }
+    }
+    if (!run.vis[y][x]) { ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x * T, y * T, T, T); }
+  }
+  const s = run.stairs;
+  if (run.seen[s.y][s.x]) {
+    const open = run.bossDead;
+    if (run.vis[s.y][s.x]) { ctx.fillStyle = open ? E.accent : '#ff5c6c'; ctx.globalAlpha = .18 + (open ? .1 * Math.sin(now / 250) : 0); ctx.fillRect(s.x * T, s.y * T, T, T); ctx.globalAlpha = 1; }
+    gl(run.era === LAST ? '\u03A9' : '>', s.x, s.y, open ? '#6fe08f' : '#ff5c6c');
+  }
+  const ic = { potion:['!','#6fe08f'], weapon:['/','#ffcf5c'], armor:['[','#7aa7ff'], scroll:['?','#d49cff'] };
+  for (const it of run.items) if (run.vis[it.y][it.x]) gl(ic[it.kind][0], it.x, it.y, ic[it.kind][1]);
+  for (const m of run.mons) {
+    if (m.hp <= 0 || !run.vis[m.y][m.x]) continue;
+    if (m.boss) { ctx.fillStyle = m.t.c; ctx.globalAlpha = .22; ctx.fillRect(m.x * T, m.y * T, T, T); ctx.globalAlpha = 1; }
+    gl(m.t.g, m.x, m.y, m.t.c);
+    if (m.hp < m.maxhp) {
+      ctx.fillStyle = '#000'; ctx.fillRect(m.x * T + 1, m.y * T, T - 2, 3);
+      ctx.fillStyle = '#ff5c6c'; ctx.fillRect(m.x * T + 1, m.y * T, (T - 2) * m.hp / m.maxhp, 3);
+    }
+  }
+  ctx.fillStyle = '#ffcf5c'; ctx.globalAlpha = .2; ctx.fillRect(P.x * T, P.y * T, T, T); ctx.globalAlpha = 1;
+  gl('@', P.x, P.y, '#ffe9a8');
+
+  run.fx = run.fx.filter(f => now - f.t0 < (f.k === 'r' ? 450 : 750));
+  for (const f of run.fx) {
+    const a = (now - f.t0) / (f.k === 'r' ? 450 : 750);
+    if (f.k === 'r') {
+      ctx.strokeStyle = f.col; ctx.globalAlpha = 1 - a; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(f.x * T + T / 2, f.y * T + T / 2, f.r * T * a + 4, 0, 7); ctx.stroke(); ctx.globalAlpha = 1;
+    } else {
+      ctx.globalAlpha = 1 - a * a; ctx.font = `bold ${T - 6}px "Courier New",monospace`;
+      ctx.fillStyle = '#000'; ctx.fillText(f.txt, f.x * T + T / 2 + 1, f.y * T - a * 16 + 1);
+      ctx.fillStyle = f.col; ctx.fillText(f.txt, f.x * T + T / 2, f.y * T - a * 16);
+      ctx.globalAlpha = 1; ctx.font = `bold ${T - 4}px "Courier New",monospace`;
+    }
+  }
+  if (now - run.flash < 180) { ctx.fillStyle = 'rgba(255,40,60,' + (.28 * (1 - (now - run.flash) / 180)) + ')'; ctx.fillRect(0, 0, cv.width, cv.height); }
+}
+
+function updateUI() {
+  const E = ERAS[run.era];
+  $('eraName').textContent = E.name;
+  $('eraDate').textContent = E.date + (run.loop ? '  \u2022  Loop ' + (run.loop + 1) : '');
+  $('pips').innerHTML = ERAS.map((e, i) => `<span class="${i < run.era ? 'done' : i === run.era ? 'cur' : ''} ${i === LAST ? 'final' : ''}" title="${e.name}"></span>`).join('');
+  $('hpbar').style.width = Math.max(0, P.hp / P.maxhp * 100) + '%';
+  $('hpTxt').textContent = Math.max(0, P.hp) + ' / ' + P.maxhp;
+  $('xpbar').style.width = (P.xp / (12 + P.lvl * 14) * 100) + '%';
+  const row = (k, v) => `<span>${k}</span><span>${v}</span>`;
+  $('stats').innerHTML =
+    row('Level', P.lvl) + row('Attack', atkTot()) + row('Defense', defTot()) +
+    row('Weapon', P.wT >= 0 ? ERAS[P.wT].weapon : 'Bare fists') +
+    row('Armor', P.aT >= 0 ? ERAS[P.aT].armor : 'None') +
+    row('Remedies (E)', P.potions) +
+    row(E.skill + ' (Q)', P.skillCd > 0 ? 'in ' + P.skillCd : 'ready') +
+    row('Echoes this run', run.echoes);
+  const lg = $('log');
+  lg.innerHTML = '';
+  for (const l of run.log.slice(-9)) { const d = document.createElement('div'); d.className = l.c; d.textContent = l.m; lg.appendChild(d); }
+}
+
+function frame() {
+  if (run && dirty) { updateUI(); dirty = false; }
+  draw();
+  requestAnimationFrame(frame);
+}
+
+/* ───────────── input ───────────── */
+const MOVE = {
+  ArrowUp:[0,-1], ArrowDown:[0,1], ArrowLeft:[-1,0], ArrowRight:[1,0],
+  w:[0,-1], s:[0,1], a:[-1,0], d:[1,0], k:[0,-1], j:[0,1], h:[-1,0], l:[1,0],
+  y:[-1,-1], u:[1,-1], b:[-1,1], n:[1,1],
+  8:[0,-1], 2:[0,1], 4:[-1,0], 6:[1,0], 7:[-1,-1], 9:[1,-1], 1:[-1,1], 3:[1,1]
+};
+addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (ovOpen) {
+    if (e.key === 'Enter' && document.activeElement === document.body) { const b = ovEl.querySelector('[data-start]'); if (b) b.click(); }
+    return;
+  }
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (MOVE[k]) { e.preventDefault(); playerMove(MOVE[k][0], MOVE[k][1]); }
+  else if (k === '.' || k === ' ' || k === '5') { e.preventDefault(); wait(); }
+  else if (k === 'q') useSkill();
+  else if (k === 'e') drink();
+});
+$('pad').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.d) { const [dx, dy] = b.dataset.d.split(',').map(Number); playerMove(dx, dy); }
+  else if (b.dataset.a === 'wait') wait();
+  else if (b.dataset.a === 'skill') useSkill();
+  else if (b.dataset.a === 'heal') drink();
+});
+
+/* ───────────── boot ───────────── */
+ov(titleHTML);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
